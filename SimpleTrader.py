@@ -111,6 +111,8 @@ while True:
 	if("TYPE=PRICE|FEEDCODE=SP-FUTURE" in data):
 		instrument = 'SP-FUTURE'
 		bidPrice, askPrice = getPrices(data)
+		old_hist_SP_Bid.append(bidPrice)
+		old_hist_SP_Ask.append(askPrice)
 
 		# pred_ask, pred_bid = gradientBoosting(askPrice, bidPrice, old_hist_SP_Ask, old_hist_SP_Bid)
 
