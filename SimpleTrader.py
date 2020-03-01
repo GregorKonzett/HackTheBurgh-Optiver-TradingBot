@@ -52,7 +52,7 @@ def gradientBoosting(item):
 	X.append([bidP, bidVol, askP, askVol])
 
 PRICES_LENGTH = 15
-THRESHHOLD = 0
+THRESHHOLD = 0.5
 AMOUNT_SCALING = 10
 
 informationRetriever = InformationRetriever("35.179.45.135",7001)
@@ -85,11 +85,12 @@ while True:
 				print("Buying FP at ",askPrice)
 				fpLastBought = askPrice
 				sender.send_order("SP-FUTURE","BUY",askPrice,10)
+				continue
 
 		if(len(bidPrices) >= PRICES_LENGTH):
 			a,b = bestLine(bidPrices)
 			
-			if (bidPrice + THRESHHOLD < a+(len(bidPrices)+1)*b and bidPrice > fpLastBought):
+			if (bidPrice + THRESHHOLD < a+(len(bidPrices)+1)*b):
 				print(bidPrice,(a+(len(bidPrices)+1)*b))
 				#Sell
 				print("Selling FP at ",bidPrice)
@@ -119,6 +120,7 @@ while True:
 				print("Buying ESX at ",esxAskPrice)
 				esxLastBought = esxAskPrice
 				sender.send_order("SP-FUTURE","BUY",esxAskPrice,10)
+				continue
 
 		if(len(esxBidPrices) >= PRICES_LENGTH):
 			a,b = bestLine(esxBidPrices)
