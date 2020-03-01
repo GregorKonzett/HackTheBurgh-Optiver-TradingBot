@@ -9,9 +9,6 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
 
-X = []
-SPY = []
-
 def getPrices(data):
 	return float(data.split("|")[2].split("=")[1]),float(data.split("|")[4].split("=")[1])
 
@@ -34,27 +31,48 @@ def bestLine(prices):
 
 	return a,b
 
-def parse(item): 
-#TYPE=PRICE|FEEDCODE=SP-FUTURE|BID_PRICE=3011|BID_VOLUME=1853|ASK_PRICE=3011.25|ASK_VOLUME=257
-	return float(data.split("|")[2].split("=")[1]), float(data.split("|")[3].split("=")[1]), float(data.split("|")[4].split("=")[1]), float(data.split("|")[5].split("=")[1])
+pod = 15
+# clf = linear_model.LinearRegression()
+clf = ensemble.GradientBoostingRegressor(n_estimators = 500, max_depth = 10, min_samples_split = 2,
+	learning_rate = 0.2, loss = 'ls')
+old_hist_SP_Ask = []
+old_hist_SP_Bid = []
+trade_hist_SP_Ask = []
+trade_hist_SP_Bid = []
 
-def gradientBoosting(item): 
-	bidP, bidVol, askP, askVol = parse(item)
-	if len(SPY) >= 10: 
-		x_train = np.array(X).astype(np.float64)
-		clf = ensemble.GradientBoostingRegressor(n_estimators = 400, max_depth = 5, min_samples_split = 2,
-				learning_rate = 0.1, loss = 'ls')
-		clf.fit(x_train, np.array(SPY).astype(np.float))
-		x_test = np.array([bidP, bidVol, askP, askVol]).astype(np.float64).reshape(1,-1)
-		y_pred = clf.predict(x_test)
-		print("\n\tPREDICT SPY", y_pred)
+old_hist_ESX_Ask = []
+old_hist_ESX_Bid = []
+trade_hist_ESX_Ask = []
+trade_hist_ESX_Bid = []
 
-	X.append([bidP, bidVol, askP, askVol])
+pred_ask_ESX = -1
+pred_bid_ESX = -1
+pred_ask_SP = -1
+pred_bid_SP = -1
 
-PRICES_LENGTH = 15
-THRESHHOLD = 0.5
-AMOUNT_SCALING = 10
+def gradientBoosting(pair, old_list, trade_list, biddi): 
+	if len(old_list) < pod+1 or len(trade_list) < pod: 
+		trade_list.append(pair)
+		return -1 
 
+	X = [[old_list[i-1], trade_list[i][0], trade_list[i][1]] for i in range(-1*pod, 0)]
+	ask_X_train = np.array(X).astype(np.float64)
+	Y = old_list[len(old_list) - pod:]
+	ask_Y_train = np.array(Y).astype(np.float64)
+
+	clf.fit(ask_X_train, ask_Y_train)
+	trade_list.append(pair)
+	y_pred = clf.predict([[old_list[-1], pair[0], pair[1]]])
+
+	if biddi: 
+		print("PREDICT BID   ", y_pred)
+		return y_pred
+	
+	else: 
+		print("PREDICT ASK   ", y_pred)
+		return y_pred
+
+THRESHHOLD = 0.1
 informationRetriever = InformationRetriever("35.179.45.135",7001)
 sender = Sender()
 
@@ -69,76 +87,67 @@ esxLastBought = -1
 
 while True:
 	data = informationRetriever.receivePrices().decode("utf-8")
+	print(data)
+	if("TYPE=TRADE|FEEDCODE=ESX-FUTURE|SIDE=BID" in data):
+		instrument = 'ESX-FUTURE'
+		price, volume = float(data.split("|")[3].split("=")[1]),float(data.split("|")[4].split("=")[1])
+		pred_bid_ESX = gradientBoosting([price, volume], old_hist_ESX_Bid, trade_hist_ESX_Bid, True)
+ 
+ 	if("TYPE=TRADE|FEEDCODE=ESX-FUTURE|SIDE=ASK" in data):
+		instrument = 'ESX-FUTURE'
+		price, volume = float(data.split("|")[3].split("=")[1]),float(data.split("|")[4].split("=")[1])
+		pred_ask_ESX = gradientBoosting([price, volume], old_hist_ESX_Ask, trade_hist_ESX_Ask, False)
+
+	if("TYPE=TRADE|FEEDCODE=SP-FUTURE|SIDE=BID" in data):
+		instrument = 'SP-FUTURE'
+		price, volume = float(data.split("|")[3].split("=")[1]),float(data.split("|")[4].split("=")[1])
+		pred_bid_SP = gradientBoosting([price, volume], old_hist_SP_Bid, trade_hist_SP_Bid, True)
+ 
+ 	if("TYPE=TRADE|FEEDCODE=ESX-FUTURE|SIDE=ASK" in data):
+		instrument = 'SP-FUTURE'
+		price, volume = float(data.split("|")[3].split("=")[1]),float(data.split("|")[4].split("=")[1])
+		pred_ask_SP = gradientBoosting([price, volume], old_hist_SP_Ask, trade_hist_SP_Ask, False)
+
 	if("TYPE=PRICE|FEEDCODE=SP-FUTURE" in data):
-		print(data)
+		instrument = 'SP-FUTURE'
 		bidPrice, askPrice = getPrices(data)
 
-		if (len(X) > 0):
-			SPY.append(askPrice)
-			print("Actual SPY ASK PRICE IS: ", askPrice)
+		# pred_ask, pred_bid = gradientBoosting(askPrice, bidPrice, old_hist_SP_Ask, old_hist_SP_Bid)
 
-		if(len(askPrices) >= PRICES_LENGTH):
-			a,b = bestLine(askPrices)
+		# if (pred_ask > 0 and pred_ask - THRESHHOLD > askPrice):
+		# 	#Buy
+		# 	print("Buying 15 SP at ",askPrice)
+		# 	fpLastBought = askPrice
+		# 	sender.send_order(instrument,"BUY",askPrice,15)
+		# 	continue
 
-			if (askPrice + THRESHHOLD < a+(len(askPrices)+1)*b):
-				#Buy
-				print("Buying FP at ",askPrice)
-				fpLastBought = askPrice
-				sender.send_order("SP-FUTURE","BUY",askPrice,10)
-				continue
+		# if (pred_bid > 0 and pred_bid + THRESHHOLD < bidPrice):
+		# 	#print(bidPrice,(a+(len(bidPrices)+1)*b))
+		# 	#Sell
+		# 	print("Selling 15 SP at ",bidPrice)
+		# 	sender.send_order(instrument,"SELL",bidPrice,15)
 
-		if(len(bidPrices) >= PRICES_LENGTH):
-			a,b = bestLine(bidPrices)
-			
-			if (bidPrice + THRESHHOLD < a+(len(bidPrices)+1)*b):
-				print(bidPrice,(a+(len(bidPrices)+1)*b))
-				#Sell
-				print("Selling FP at ",bidPrice)
-				sender.send_order("SP-FUTURE","SELL",bidPrice,15)
-
-		if(len(bidPrices) >= PRICES_LENGTH):
-			del(bidPrices[0])
-		
-		bidPrices.append(bidPrice)
-
-		if(len(askPrices) >= PRICES_LENGTH):
-			del(askPrices[0])
-
-		askPrices.append(askPrice)
 
 	if("TYPE=PRICE|FEEDCODE=ESX-FUTURE" in data):
-		print(data)
-		esxBidPrice, esxAskPrice = getPrices(data)
+		instrument = 'ESX-FUTURE'
+		bidPrice, askPrice = getPrices(data)
+		old_hist_ESX_Bid.append(bidPrice)
+		old_hist_ESX_Ask.append(askPrice)
+		# pred_ask, pred_bid = gradientBoosting(askPrice, bidPrice, old_hist_ESX_Ask, old_hist_ESX_Bid)
 
-		gradientBoosting(data)
+		# if (pred_ask > 0 and pred_ask - THRESHHOLD > askPrice):
+		# 	#Buy
+		# 	print("Buying 15 ESX at ",askPrice)
+		# 	fpLastBought = askPrice
+		# 	sender.send_order(instrument,"BUY",askPrice,15)
+		# 	continue
 
-		if(len(esxAskPrices) >= PRICES_LENGTH):
-			a,b = bestLine(esxAskPrices)
+		# if (pred_bid > 0 and pred_bid + THRESHHOLD < bidPrice):
+		# 	#print(bidPrice,(a+(len(bidPrices)+1)*b))
+		# 	#Sell
+		# 	print("Selling 15 ESX at ",bidPrice)
+		# 	sender.send_order(instrument,"SELL",bidPrice,15)
 
-			if (esxAskPrice + THRESHHOLD < a+(len(esxAskPrices)+1)*b):
-				#Buy
-				print("Buying ESX at ",esxAskPrice)
-				esxLastBought = esxAskPrice
-				sender.send_order("SP-FUTURE","BUY",esxAskPrice,10)
-				continue
-
-		if(len(esxBidPrices) >= PRICES_LENGTH):
-			a,b = bestLine(esxBidPrices)
-
-			if (esxBidPrice + THRESHHOLD < a+(len(esxBidPrices)+1)*b and esxBidPrice > esxLastBought):
-				#Sell
-				print("Selling ESX at ",esxBidPrice)
-				sender.send_order("SP-FUTURE","SELL",esxBidPrice,15)
-
-		if(len(esxBidPrices) >= PRICES_LENGTH):
-			del(esxBidPrices[0])
-		
-		esxBidPrices.append(esxBidPrice)
-
-		if(len(esxAskPrices) >= PRICES_LENGTH):
-			del(esxAskPrices[0])
-
-		esxAskPrices.append(esxAskPrice)
 
 
 
