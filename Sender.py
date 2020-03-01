@@ -27,10 +27,13 @@ class Sender:
 		If you want to buy  100 SP-FUTURES at a price of 3000:
 		- send_order("SP-FUTURE", "BUY", 3000, 100)
 		"""
-		order_message = f"TYPE=ORDER|USERNAME={USERNAME}|PASSWORD={PASSWORD}|FEEDCODE={target_feedcode}|ACTION={action}|PRICE={target_price}|VOLUME={volume}"
-		print(f"[SENDING ORDER] {order_message}")
-		self.eml_sock.sendto(order_message.encode(), (REMOTE_IP, EML_UDP_PORT_REMOTE))
 
+		if volume == 0:
+			return -1
+
+		order_message = "TYPE=ORDER|USERNAME={}|PASSWORD={}|FEEDCODE={}|ACTION={}|PRICE={}|VOLUME={}".format(USERNAME,PASSWORD,target_feedcode,action,target_price,volume)
+		print("[SENDING ORDER] {}".format(order_message))
+		self.eml_sock.sendto(order_message.encode(), (REMOTE_IP, EML_UDP_PORT_REMOTE))
 
 		data, addr = self.eml_sock.recvfrom(1024)
 		message = (data.decode("utf-8"))

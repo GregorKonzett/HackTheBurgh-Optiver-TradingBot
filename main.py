@@ -29,36 +29,18 @@ amount_esx = -3
 amount_sp = 431
 candleDetector = CandleDetector()
 
+def handleMessage(self, data):
+	splitData = data.split("|")
+	if(data.startswith("TYPE=TRADE")):
+		currentTrade = Trade(splitData[1].split("=")[1], splitData[2].split("=")[1], float(splitData[3].split("=")[1]), int(splitData[4].split("=")[1]))
+
+	elif(data.startswith("TYPE=PRICE")):
+		currentPrice = Price(splitData[1].split("=")[1], float(splitData[2].split("=")[1]),int(splitData[3].split("=")[1]),float(splitData[4].split("=")[1]),int(splitData[5].split("=")[1]))
+
+
+
 while count == 0:
 	data = informationReceiver.receivePrices().decode("utf-8")
 	logging.debug(data)
 	print(data)
-	if("SP-FUTURE" in data and "TYPE=PRICE" in data):
-		
-		ESXHandler.handleData(data)
-
-		if(len(ESXHandler.askCandles) >= MIN_ESX_CANDLES):
-			print("Midpoint: ",ESXHandler.midpoint, "Buy Price: ",ESXHandler.getPrices(data)[1]," Sell Price: ",ESXHandler.getPrices(data)[0])
-			if(candleDetector.shouldBuy(ESXHandler.askCandles[-1]) or ESXHandler.getPrices(data)[1] < ESXHandler.midpoint):
-				print("Buying at Price ",ESXHandler.getPrices(data)[1])
-				PREV_BUY = sender.send_order("SP-FUTURE","BUY",ESXHandler.getPrices(data)[1], BUY_AMOUNT)
-				print(PREV_BUY)
-
-				if PREV_BUY != -1:
-					amount_sp += BUY_AMOUNT
-					logging.info("Buying price is:", PREV_BUY)
-					logging.info("New count of SP-FUTURE Stock:", amount_sp)
-
-			if((candleDetector.shouldSell(ESXHandler.bidCandles[-1]) or ESXHandler.getPrices(data)[0] > ESXHandler.midpoint) ):
-				print("Selling at price", ESXHandler.getPrices(data)[0]); 
-				PREV_SELL = sender.send_order("SP-FUTURE","SELL",ESXHandler.getPrices(data)[0], SELL_AMOUNT)
-				print(PREV_SELL)
-				logging.info(PREV_SELL)
-
-				if PREV_SELL != -1:
-					amount_sp -= SELL_AMOUNT
-					logging.info("Selling price is:", PREV_BUY)
-					logging.info("New count of SP-FUTURE Stock:", amount_sp)
-
-
-			print(amount_sp)
+	

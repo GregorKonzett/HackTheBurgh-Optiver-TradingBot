@@ -11,3 +11,4 @@ class InformationRetriever:
 	def receivePrices(self):
 		data, addr = self.sock.recvfrom(1024)
 		return data
+		
